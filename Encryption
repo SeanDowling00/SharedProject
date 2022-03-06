@@ -1,0 +1,134 @@
+<?php
+$host = 'localhost';
+$username = 'root';
+$password = '';
+$conn = new mysqli($host, $username, $password);
+
+$cipher = 'AES-128-CBC';
+$key = 'thebestsecretkey';
+
+if ($conn->connect_error) {
+  die('Connection failed: ' . $conn->connect_error);
+}
+
+if (isset($_POST['delete-everything'])) {
+  $sql = 'DROP DATABASE clubsandsoc;';
+  if (!$conn->query($sql) === TRUE) {
+    die('Error dropping database: ' . $conn->error);
+  }
+}
+
+$sql = 'CREATE DATABASE IF NOT EXISTS clubsandsoc;';
+if (!$conn->query($sql) === TRUE) {
+  die('Error creating database: ' . $conn->error);
+}
+
+$sql = 'USE clubsandsoc;';
+if (!$conn->query($sql) === TRUE) {
+  die('Error using database: ' . $conn->error);
+}
+
+$sql = 'CREATE TABLE IF NOT EXISTS clubs (
+id int NOT NULL AUTO_INCREMENT,
+iv varchar(32) NOT NULL,
+name varchar(256) NOT NULL,
+password varchar(256) NOT NULL,
+studentid varchar(256) NOT NULL,
+number int(10) NOT NULL,
+email varchar(256) NOT NULL,
+dob date NOT NULL,
+medinfo varchar(256) NOT NULL,
+photo varbinary(100) NOT NULL,
+PRIMARY KEY (id));';
+if (!$conn->query($sql) === TRUE) {
+  die('Error creating table: ' . $conn->error);
+}
+?>
+<html>
+<head>
+<title>Secure Notepad</title> </head>
+<body>
+<h1>Secure Notepad</h1>
+<?php
+if (isset($_POST['new-member'])) {
+$iv = random_bytes(16);
+$name = $conn -> real_escape_string($_POST['name']);
+$password = $conn -> real_escape_string($_POST['password']);
+$studentid = $conn -> real_escape_string($_POST['studentid']);
+$number = $conn -> real_escape_string($_POST['number']);
+$email = $conn -> real_escape_string($_POST['email']);
+$dob = $conn -> real_escape_string($_POST['dob']);
+$medinfo = $conn -> real_escape_string($_POST['medinfo']);
+$photo = $conn -> real_escape_string($_POST['photo']);
+    
+$encrypted_name = openssl_encrypt($name, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_password = openssl_encrypt($password, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_studentid = openssl_encrypt($studentid, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_number = openssl_encrypt($number, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_email = openssl_encrypt($email, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_dob = openssl_encrypt($dob, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_medinfo = openssl_encrypt($medinfo, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+$encrypted_photo = openssl_encrypt($photo, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+
+$iv_hex = bin2hex($iv);
+$name_hex = bin2hex($encrypted_name);
+$password_hex = bin2hex($encrypted_password);
+$studentid_hex = bin2hex($encrypted_studentid);
+$number_hex = bin2hex($encrypted_number);
+$email_hex = bin2hex($encrypted_email);
+$dob_hex = bin2hex($encrypted_dob);
+$medinfo_hex = bin2hex($encrypted_medinfo);
+$photo_hex = bin2hex($encrypted_photo);
+    
+  $sql = "INSERT INTO clubs (iv, name, password, studentid, number, email, dob, medinfo, photo) VALUES ('$iv_hex', '$name_hex' ,'$password_hex', '$studentid_hex', '$number_hex', '$email_hex', '$dob_hex', '$medinfo_hex' ,'$photo_hex')";
+  if ($conn->query($sql) === TRUE) {
+    echo '<p><i>New note added!</i></p>';
+  } else {
+    die('Error creating member: ' . $conn->error);
+  }
+}
+?>
+<h2>Create a New Note</h2>
+
+<form method="post">
+  <input type="text" id="name" name="name" size="64"><br><br>
+ <input type="text" id="studentid" name="studentid" placeholder="Student ID"><br><br>
+    <input type="password" id="password" name="password" size="64" placeholder="Password"><br><br>
+    <input type="number" id="number" name="number" placeholder="Phone Number"><br><br>
+    <input type="email" id="email" name="email"  placeholder="Email"><br><br>
+    <input type="date" id="dob" name="dob" ><br><br>
+    <input type="file" name="photo" id="photo" multiple><br><br>
+    <input type="text" id="medinfo" name="medinfo" size="64" placeholder="Medical Information where applicable"><br><br>
+  <button type="submit" name="new-member">Create Note</button>
+</form>
+
+<h2>List Existing Notes</h2>
+
+    
+<?php
+$sql = "SELECT id, iv, name FROM clubs";
+$result = $conn->query($sql);
+
+if ($result->num_rows > 0) {
+  echo '<table><tr><th>ID</th><th>Members</th></tr>';
+  while($row = $result->fetch_assoc()) {
+    $id = $row['id'];
+    $iv = hex2bin($row['iv']);
+    $name = hex2bin($row['name']);
+    $unencrypted_name = openssl_decrypt($name, $cipher, $key, OPENSSL_RAW_DATA, $iv);
+    echo "<tr><td>$id</td><td>$unencrypted_name</td></tr>";
+  }
+  echo '</table>';
+} else {
+  echo '<p>There are no notes!</p>';
+}
+?>
+
+    
+<h3>Delete Everything</h3>
+
+<form method="post">
+  <button type="submit" name="delete-everything">Delete Everything!</button>
+</form>
+</body>
+</html>
